@@ -1,0 +1,29 @@
+============================================================
+  RAPPORT D'ANALYSE - SON STÉTHOSCOPE TÉLÉCONSULTATION
+============================================================
+
+  Sample rate     : 44100 Hz
+  Durée           : 20.41 secondes
+  Filtre appliqué : Butterworth ordre 4, passe-bande 20-600 Hz
+
+--- QUALITÉ DU SIGNAL ---
+  SNR estimé (filtré vs bruit retiré) : -4.4 dB
+  Énergie dans la bande cardiaque     : 33.8%
+
+--- DYNAMIQUE ---
+                                     Original       Filtré
+  RMS                                0.401386     0.191690
+  Pic                                1.000000     1.104281
+  Facteur de crête                       2.49         5.76
+
+--- INTERPRÉTATION ---
+  [KO] SNR faible (<8 dB) - qualité insuffisante pour diagnostic fiable
+  [!!] Bruit significatif hors bande cardiaque - filtrage recommandé
+
+--- RECOMMANDATIONS MÉDECIN ---
+  1. Casque fermé obligatoire (ex: Beyerdynamic DT 770 Pro 80ohm)
+  2. Ne JAMAIS utiliser des haut-parleurs ou du Bluetooth
+  3. Écouter dans un environnement calme (<35 dB ambiant)
+  4. Comparer signal original ET filtré
+  5. Coupler l'écoute avec le spectrogramme visuel si possible
+============================================================
