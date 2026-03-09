@@ -1,5 +1,5 @@
-export const WS_URL = "ws://localhost:8000/ws/audio";
-export const API_URL = "http://localhost:8000/api";
+export const WS_URL = "ws://localhost:8001/ws/audio";
+export const API_URL = "http://localhost:8001/api";
 export const SAMPLE_RATE = 44100;
 export const CHUNK_SIZE = 1024;
 
@@ -10,7 +10,7 @@ export const MODE_LABELS: Record<string, string> = {
 };
 
 export const MODE_COLORS: Record<string, string> = {
-  cardiac: "#ef4444",
-  respiratory: "#3b82f6",
-  raw: "#a3a3a3",
+  cardiac: "#f87171",
+  respiratory: "#60a5fa",
+  raw: "#a1a1aa",
 };

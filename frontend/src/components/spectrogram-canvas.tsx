@@ -7,88 +7,89 @@ interface SpectrogramCanvasProps {
   height?: number;
 }
 
-// Color map: dark blue → cyan → yellow → red
-function dbToColor(db: number): string {
-  // Normalize: -80dB = cold, -10dB = hot
-  const t = Math.max(0, Math.min(1, (db + 80) / 70));
+// Color map: deep blue → teal → green → yellow → orange → red/white
+function dbToRGB(db: number): [number, number, number] {
+  const t = Math.max(0, Math.min(1, (db + 80) / 65));
 
-  let r: number, g: number, b: number;
-  if (t < 0.33) {
-    const s = t / 0.33;
-    r = 0;
-    g = Math.floor(s * 180);
-    b = Math.floor(60 + s * 195);
-  } else if (t < 0.66) {
-    const s = (t - 0.33) / 0.33;
-    r = Math.floor(s * 255);
-    g = Math.floor(180 + s * 75);
-    b = Math.floor(255 - s * 255);
+  if (t < 0.2) {
+    const s = t / 0.2;
+    return [0, Math.floor(s * 40), Math.floor(20 + s * 80)];
+  } else if (t < 0.4) {
+    const s = (t - 0.2) / 0.2;
+    return [0, Math.floor(40 + s * 120), Math.floor(100 + s * 80)];
+  } else if (t < 0.6) {
+    const s = (t - 0.4) / 0.2;
+    return [Math.floor(s * 80), Math.floor(160 + s * 60), Math.floor(180 - s * 100)];
+  } else if (t < 0.8) {
+    const s = (t - 0.6) / 0.2;
+    return [Math.floor(80 + s * 175), Math.floor(220 - s * 60), Math.floor(80 - s * 60)];
   } else {
-    const s = (t - 0.66) / 0.34;
-    r = 255;
-    g = Math.floor(255 - s * 200);
-    b = 0;
+    const s = (t - 0.8) / 0.2;
+    return [255, Math.floor(160 + s * 95), Math.floor(20 + s * 100)];
   }
-
-  return `rgb(${r},${g},${b})`;
 }
 
-export function SpectrogramCanvas({ row, height = 200 }: SpectrogramCanvasProps) {
+export function SpectrogramCanvas({ row, height = 220 }: SpectrogramCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const imageDataRef = useRef<ImageData | null>(null);
+  const bufferRef = useRef<ImageData | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !row || row.length === 0) return;
 
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext("2d", { alpha: false });
     if (!ctx) return;
 
-    const dpr = window.devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
-    const w = Math.floor(rect.width * dpr);
-    const h = Math.floor(rect.height * dpr);
+    const w = Math.floor(rect.width);
+    const h = Math.floor(rect.height);
 
-    // Initialize canvas size if needed
     if (canvas.width !== w || canvas.height !== h) {
       canvas.width = w;
       canvas.height = h;
-      ctx.scale(dpr, dpr);
-      imageDataRef.current = null;
+      bufferRef.current = null;
     }
 
-    // Shift existing content left by 1 column (scrolling spectrogram)
-    if (imageDataRef.current) {
-      ctx.putImageData(imageDataRef.current, -dpr, 0);
+    // Shift image left by 2px
+    if (bufferRef.current) {
+      ctx.putImageData(bufferRef.current, -2, 0);
     }
 
-    // Draw new column on the right edge
-    const displayW = rect.width;
-    const displayH = rect.height;
-    const colX = displayW - 1;
-    const binH = displayH / row.length;
+    // Draw new column(s) on right edge
+    const colWidth = 2;
+    const binH = h / row.length;
 
     for (let i = 0; i < row.length; i++) {
-      // Spectrogram: low freq at bottom
-      const y = displayH - (i + 1) * binH;
-      ctx.fillStyle = dbToColor(row[i]);
-      ctx.fillRect(colX, y, 2, Math.ceil(binH) + 1);
+      const y = h - (i + 1) * binH;
+      const [r, g, b] = dbToRGB(row[i]);
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      ctx.fillRect(w - colWidth, y, colWidth, Math.ceil(binH) + 1);
     }
 
-    // Save for next shift
-    imageDataRef.current = ctx.getImageData(0, 0, w, h);
+    bufferRef.current = ctx.getImageData(0, 0, w, h);
   }, [row]);
 
   return (
-    <div className="space-y-1">
-      <label className="text-xs font-medium text-neutral-400 uppercase tracking-wider">
-        Spectrogramme
-      </label>
-      <canvas
-        ref={canvasRef}
-        style={{ height }}
-        className="w-full rounded-lg border border-neutral-800 bg-[#0a0a0a]"
-      />
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <label className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-[0.08em]">
+          Spectrogramme
+        </label>
+        <div className="flex items-center gap-3 text-[10px] text-[var(--text-muted)]">
+          <span>Basses freq.</span>
+          <div className="w-16 h-1.5 rounded-full" style={{
+            background: "linear-gradient(90deg, #001450, #00a0b4, #50dc50, #ffb414, #ff6428, #fff078)"
+          }} />
+          <span>Hautes freq.</span>
+        </div>
+      </div>
+      <div className="canvas-container rounded-xl overflow-hidden">
+        <canvas
+          ref={canvasRef}
+          style={{ height }}
+          className="w-full bg-[#0c0c12] block"
+        />
+      </div>
     </div>
   );
 }
