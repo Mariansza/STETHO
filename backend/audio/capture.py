@@ -6,7 +6,7 @@ import logging
 import numpy as np
 import sounddevice as sd
 
-from backend.config import SAMPLE_RATE, CHUNK_SIZE, CHANNELS, DTYPE
+from backend.config import CHUNK_SIZE, CHANNELS, DTYPE
 
 logger = logging.getLogger(__name__)
 
@@ -20,10 +20,15 @@ class AudioCapture:
         self._loop: asyncio.AbstractEventLoop | None = None
         self._device_id: int | None = None
         self._running: bool = False
+        self._sample_rate: int = 44100
 
     @property
     def running(self) -> bool:
         return self._running
+
+    @property
+    def sample_rate(self) -> int:
+        return self._sample_rate
 
     @property
     def queue(self) -> asyncio.Queue[np.ndarray]:
@@ -46,19 +51,31 @@ class AudioCapture:
             pass  # drop oldest-ish — consumer is too slow
 
     async def start(self, device_id: int | None = None) -> None:
-        """Start audio capture stream."""
+        """Start audio capture stream using the device's native sample rate."""
         if self._running:
             await self.stop()
 
         self._device_id = device_id
         self._loop = asyncio.get_running_loop()
 
+        # Query device's native sample rate to avoid resampling artifacts
+        if device_id is not None:
+            try:
+                dev_info = sd.query_devices(device_id)
+                native_sr = int(dev_info["default_samplerate"])
+                self._sample_rate = native_sr
+                logger.info("Using device native sample rate: %d Hz", native_sr)
+            except Exception:
+                self._sample_rate = 44100
+        else:
+            self._sample_rate = 44100
+
         # Drain any stale data
         while not self._queue.empty():
             self._queue.get_nowait()
 
         self._stream = sd.InputStream(
-            samplerate=SAMPLE_RATE,
+            samplerate=self._sample_rate,
             blocksize=CHUNK_SIZE,
             device=device_id,
             channels=CHANNELS,
@@ -68,7 +85,7 @@ class AudioCapture:
         self._stream.start()
         self._running = True
         logger.info("Audio capture started (device=%s, sr=%d, chunk=%d)",
-                     device_id, SAMPLE_RATE, CHUNK_SIZE)
+                     device_id, self._sample_rate, CHUNK_SIZE)
 
     async def stop(self) -> None:
         """Stop audio capture stream."""

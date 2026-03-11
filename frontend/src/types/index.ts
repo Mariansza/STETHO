@@ -19,6 +19,11 @@ export interface VizMessage {
   metrics: AudioMetrics;
 }
 
+export interface ConfigMessage {
+  type: "config";
+  sample_rate: number;
+}
+
 export interface AudioDevice {
   id: number;
   name: string;
@@ -41,6 +46,7 @@ export type ClientMessage =
   | { type: "set_params"; params: DSPParams }
   | { type: "set_device"; device_id: number }
   | { type: "set_noise_reduction"; alpha: number; beta: number }
-  | { type: "recalibrate_noise" };
+  | { type: "recalibrate_noise" }
+  | { type: "set_passthrough"; enabled: boolean };
 
 export type ConnectionStatus = "disconnected" | "connecting" | "connected" | "error";

@@ -1,37 +1,93 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { SAMPLE_RATE } from "@/lib/constants";
+
+/**
+ * Gapless audio playback by batching PCM chunks before scheduling.
+ *
+ * Accumulates BATCH_SIZE chunks into a single AudioBufferSourceNode
+ * to minimize the number of buffer boundaries. Fewer boundaries = fewer
+ * opportunities for micro-gaps that are audible on narrow-band audio.
+ */
+const BATCH_SIZE = 4; // accumulate 4 chunks (~93ms @ 1024/44100) before playing
 
 export function useAudioPlayback() {
   const [isPlaying, setIsPlaying] = useState(false);
   const ctxRef = useRef<AudioContext | null>(null);
-  const workletRef = useRef<AudioWorkletNode | null>(null);
+  const sampleRateRef = useRef<number>(44100);
+  const nextTimeRef = useRef<number>(0);
+  const accumulatorRef = useRef<Float32Array[]>([]);
 
-  const start = useCallback(async () => {
-    if (ctxRef.current) return;
+  const start = useCallback(async (sampleRate?: number) => {
+    if (ctxRef.current) {
+      if (sampleRate && sampleRate !== sampleRateRef.current) {
+        await ctxRef.current.close();
+        ctxRef.current = null;
+      } else {
+        return;
+      }
+    }
 
-    const ctx = new AudioContext({ sampleRate: SAMPLE_RATE });
-    await ctx.audioWorklet.addModule("/worklets/pcm-playback-processor.js");
-    const worklet = new AudioWorkletNode(ctx, "pcm-playback-processor");
-    worklet.connect(ctx.destination);
+    const sr = sampleRate ?? sampleRateRef.current;
+    sampleRateRef.current = sr;
 
+    const ctx = new AudioContext({ sampleRate: sr });
     ctxRef.current = ctx;
-    workletRef.current = worklet;
+    nextTimeRef.current = 0;
+    accumulatorRef.current = [];
     setIsPlaying(true);
   }, []);
 
   const stop = useCallback(() => {
-    workletRef.current?.disconnect();
-    workletRef.current = null;
     ctxRef.current?.close();
     ctxRef.current = null;
+    nextTimeRef.current = 0;
+    accumulatorRef.current = [];
     setIsPlaying(false);
   }, []);
 
-  const feedAudio = useCallback((pcm: Float32Array) => {
-    workletRef.current?.port.postMessage(pcm);
+  const scheduleBatch = useCallback((ctx: AudioContext, chunks: Float32Array[]) => {
+    // Merge all chunks into a single buffer
+    const totalLength = chunks.reduce((sum, c) => sum + c.length, 0);
+    const merged = new Float32Array(totalLength);
+    let offset = 0;
+    for (const chunk of chunks) {
+      merged.set(chunk, offset);
+      offset += chunk.length;
+    }
+
+    const buffer = ctx.createBuffer(1, totalLength, ctx.sampleRate);
+    buffer.getChannelData(0).set(merged);
+
+    const source = new AudioBufferSourceNode(ctx);
+    source.buffer = buffer;
+    source.connect(ctx.destination);
+
+    const now = ctx.currentTime;
+    if (nextTimeRef.current <= now) {
+      nextTimeRef.current = now + 0.1; // 100ms head start for jitter absorption
+    }
+
+    source.start(nextTimeRef.current);
+    nextTimeRef.current += totalLength / ctx.sampleRate;
   }, []);
+
+  const feedAudio = useCallback((pcm: Float32Array) => {
+    const ctx = ctxRef.current;
+    if (!ctx || ctx.state === "closed") return;
+
+    if (ctx.state === "suspended") {
+      ctx.resume();
+    }
+
+    // Accumulate chunks
+    accumulatorRef.current.push(new Float32Array(pcm));
+
+    if (accumulatorRef.current.length >= BATCH_SIZE) {
+      scheduleBatch(ctx, accumulatorRef.current);
+      accumulatorRef.current = [];
+    }
+  }, [scheduleBatch]);
 
   return { isPlaying, start, stop, feedAudio };
 }

@@ -23,11 +23,20 @@ export function Header({ connectionStatus, isCapturing }: HeaderProps) {
         {/* Logo */}
         <div className="relative">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 border border-emerald-500/20 flex items-center justify-center">
-            <svg viewBox="0 0 24 24" className="w-[18px] h-[18px] text-emerald-400" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round">
-              <path d="M12 3c-1.5 0-4 1-4 4v2c0 1.5.5 2 2 2h4c1.5 0 2-.5 2-2V7c0-3-2.5-4-4-4z" />
-              <path d="M8 9l-2 1.5c-1 .8-1.5 2-1.5 3.2 0 2 1.5 3.3 3.5 3.3" />
-              <path d="M16 9l2 1.5c1 .8 1.5 2 1.5 3.2 0 2-1.5 3.3-3.5 3.3" />
-              <path d="M10 17v3.5a1.5 1.5 0 003 0V17" />
+            <svg viewBox="0 0 32 32" className="w-[20px] h-[20px]" fill="none">
+              {/* Audio waveform bars */}
+              <rect x="2" y="12" width="2.5" height="8" rx="1.25" fill="url(#waveGrad)" opacity="0.7" />
+              <rect x="7" y="8" width="2.5" height="16" rx="1.25" fill="url(#waveGrad)" opacity="0.85" />
+              <rect x="12" y="4" width="2.5" height="24" rx="1.25" fill="url(#waveGrad)" />
+              <rect x="17" y="6" width="2.5" height="20" rx="1.25" fill="url(#waveGrad)" opacity="0.9" />
+              <rect x="22" y="10" width="2.5" height="12" rx="1.25" fill="url(#waveGrad)" opacity="0.75" />
+              <rect x="27" y="13" width="2.5" height="6" rx="1.25" fill="url(#waveGrad)" opacity="0.55" />
+              <defs>
+                <linearGradient id="waveGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#34d399" />
+                  <stop offset="100%" stopColor="#059669" />
+                </linearGradient>
+              </defs>
             </svg>
           </div>
           {isCapturing && (

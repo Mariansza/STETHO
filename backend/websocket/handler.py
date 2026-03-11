@@ -7,6 +7,7 @@ import time
 from fastapi import WebSocket, WebSocketDisconnect
 
 from backend.audio.capture import AudioCapture
+from backend.audio.playback import AudioPlayback
 from backend.dsp.pipeline import DSPPipeline
 from backend.analysis.spectral import SpectralAnalyzer
 from backend.websocket.protocol import (
@@ -24,6 +25,7 @@ class AudioWebSocketHandler:
 
     def __init__(self) -> None:
         self.capture = AudioCapture()
+        self.playback = AudioPlayback()
         self.pipeline = DSPPipeline(mode="cardiac")
         self.analyzer = SpectralAnalyzer()
         self._seq: int = 0
@@ -34,7 +36,6 @@ class AudioWebSocketHandler:
         await ws.accept()
         logger.info("WebSocket client connected")
 
-        # Start a task to listen for client messages
         receive_task = asyncio.create_task(self._receive_loop(ws))
 
         try:
@@ -47,6 +48,8 @@ class AudioWebSocketHandler:
             receive_task.cancel()
             if self.capture.running:
                 await self.capture.stop()
+            if self.playback.running:
+                self.playback.stop()
             self._running = False
 
     async def _stream_loop(self, ws: WebSocket) -> None:
@@ -68,7 +71,10 @@ class AudioWebSocketHandler:
             # DSP processing
             processed = self.pipeline.process(chunk)
 
-            # Send binary audio frame
+            # Play audio directly through system speakers (no browser audio)
+            self.playback.feed(processed)
+
+            # Send binary audio frame to frontend (for waveform visualization)
             self._seq += 1
             frame = encode_audio_frame(self._seq, processed)
             await ws.send_bytes(frame)
@@ -86,22 +92,34 @@ class AudioWebSocketHandler:
             while True:
                 raw = await ws.receive_text()
                 msg = decode_client_message(raw)
-                await self._handle_message(msg)
+                await self._handle_message(msg, ws)
         except (WebSocketDisconnect, asyncio.CancelledError):
             pass
 
-    async def _handle_message(self, msg: dict) -> None:
+    async def _handle_message(self, msg: dict, ws: WebSocket) -> None:
         """Route a client control message."""
         msg_type = msg.get("type")
 
         if msg_type == "start_capture":
             device_id = msg.get("device_id")
             await self.capture.start(device_id=device_id)
+            # Sync pipeline sample rate with actual device sample rate
+            sr = self.capture.sample_rate
+            self.pipeline.set_sample_rate(sr)
+            self.analyzer = SpectralAnalyzer()
+            # Start direct audio playback to system speakers
+            self.playback.start(sr)
             self._running = True
-            logger.info("Capture started (device=%s)", device_id)
+            # Tell the frontend the actual sample rate
+            await ws.send_text(encode_viz_message({
+                "type": "config",
+                "sample_rate": sr,
+            }))
+            logger.info("Capture started (device=%s, sr=%d)", device_id, sr)
 
         elif msg_type == "stop_capture":
             await self.capture.stop()
+            self.playback.stop()
             self._running = False
             logger.info("Capture stopped")
 
@@ -109,6 +127,11 @@ class AudioWebSocketHandler:
             mode = msg.get("mode", "cardiac")
             self.pipeline.set_mode(mode)
             logger.info("Mode changed to: %s", mode)
+
+        elif msg_type == "set_passthrough":
+            enabled = msg.get("enabled", False)
+            self.pipeline.set_passthrough(enabled)
+            logger.info("Passthrough: %s", enabled)
 
         elif msg_type == "set_params":
             params = msg.get("params", {})
@@ -128,7 +151,9 @@ class AudioWebSocketHandler:
                 await self.capture.stop()
             if was_running:
                 await self.capture.start(device_id=device_id)
-            logger.info("Device changed to: %s", device_id)
+                self.pipeline.set_sample_rate(self.capture.sample_rate)
+            logger.info("Device changed to: %s (sr=%d)",
+                        device_id, self.capture.sample_rate)
 
         elif msg_type == "set_noise_reduction":
             self.pipeline.noise_reducer.set_params(
@@ -139,7 +164,6 @@ class AudioWebSocketHandler:
                         msg.get("alpha"), msg.get("beta"))
 
         elif msg_type == "recalibrate_noise":
-            # Calibrate from next N chunks
             if self.capture.running:
                 self.pipeline.noise_reducer.start_calibration()
                 for _ in range(20):

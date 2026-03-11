@@ -1,24 +1,26 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ClientMessage, ConnectionStatus, VizMessage } from "@/types";
+import type { ClientMessage, ConfigMessage, ConnectionStatus, VizMessage } from "@/types";
 import { WS_URL } from "@/lib/constants";
-import { parseAudioFrame, parseVizMessage } from "@/lib/ws-protocol";
+import { parseAudioFrame, parseJsonMessage } from "@/lib/ws-protocol";
 
 interface UseWebSocketOptions {
   onAudioFrame?: (pcm: Float32Array, seq: number) => void;
   onVizMessage?: (viz: VizMessage) => void;
+  onConfig?: (config: ConfigMessage) => void;
 }
 
-export function useWebSocket({ onAudioFrame, onVizMessage }: UseWebSocketOptions = {}) {
+export function useWebSocket({ onAudioFrame, onVizMessage, onConfig }: UseWebSocketOptions = {}) {
   const [status, setStatus] = useState<ConnectionStatus>("disconnected");
   const wsRef = useRef<WebSocket | null>(null);
   const onAudioFrameRef = useRef(onAudioFrame);
   const onVizMessageRef = useRef(onVizMessage);
+  const onConfigRef = useRef(onConfig);
 
-  // Keep refs up to date
   onAudioFrameRef.current = onAudioFrame;
   onVizMessageRef.current = onVizMessage;
+  onConfigRef.current = onConfig;
 
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
@@ -45,9 +47,12 @@ export function useWebSocket({ onAudioFrame, onVizMessage }: UseWebSocketOptions
         const { seq, pcm } = parseAudioFrame(event.data);
         onAudioFrameRef.current?.(pcm, seq);
       } else if (typeof event.data === "string") {
-        const viz = parseVizMessage(event.data);
-        if (viz) {
-          onVizMessageRef.current?.(viz);
+        const msg = parseJsonMessage(event.data);
+        if (!msg) return;
+        if (msg.type === "viz") {
+          onVizMessageRef.current?.(msg);
+        } else if (msg.type === "config") {
+          onConfigRef.current?.(msg);
         }
       }
     };
@@ -79,7 +84,6 @@ export function useWebSocket({ onAudioFrame, onVizMessage }: UseWebSocketOptions
     }
   }, [status, connect]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       wsRef.current?.close();

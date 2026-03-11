@@ -1,4 +1,4 @@
-import type { VizMessage } from "@/types";
+import type { VizMessage, ConfigMessage } from "@/types";
 
 /**
  * Parse a binary audio frame from the backend.
@@ -15,13 +15,13 @@ export function parseAudioFrame(data: ArrayBuffer): {
 }
 
 /**
- * Parse a JSON viz message from the backend.
+ * Parse a JSON message from the backend (viz or config).
  */
-export function parseVizMessage(data: string): VizMessage | null {
+export function parseJsonMessage(data: string): VizMessage | ConfigMessage | null {
   try {
     const msg = JSON.parse(data);
-    if (msg.type === "viz") {
-      return msg as VizMessage;
+    if (msg.type === "viz" || msg.type === "config") {
+      return msg;
     }
     return null;
   } catch {

@@ -50,20 +50,19 @@ export function SpectrogramCanvas({ row, height = 220 }: SpectrogramCanvasProps)
       bufferRef.current = null;
     }
 
-    // Shift image left by 2px
+    // Shift image left by 1px (slower scroll)
     if (bufferRef.current) {
-      ctx.putImageData(bufferRef.current, -2, 0);
+      ctx.putImageData(bufferRef.current, -1, 0);
     }
 
-    // Draw new column(s) on right edge
-    const colWidth = 2;
+    // Draw new column on right edge (1px wide)
     const binH = h / row.length;
 
     for (let i = 0; i < row.length; i++) {
       const y = h - (i + 1) * binH;
       const [r, g, b] = dbToRGB(row[i]);
       ctx.fillStyle = `rgb(${r},${g},${b})`;
-      ctx.fillRect(w - colWidth, y, colWidth, Math.ceil(binH) + 1);
+      ctx.fillRect(w - 1, y, 1, Math.ceil(binH) + 1);
     }
 
     bufferRef.current = ctx.getImageData(0, 0, w, h);

@@ -42,6 +42,7 @@ export function ControlPanel({
 }: ControlPanelProps) {
   const [gain, setGain] = useState(1.0);
   const [noiseAlpha, setNoiseAlpha] = useState(2.0);
+  const [passthrough, setPassthrough] = useState(false);
 
   const modes: ListeningMode[] = ["cardiac", "respiratory", "raw"];
 
@@ -70,6 +71,25 @@ export function ControlPanel({
               D&eacute;marrer la capture
             </>
           )}
+        </span>
+      </button>
+
+      {/* Passthrough toggle */}
+      <button
+        onClick={() => {
+          const next = !passthrough;
+          setPassthrough(next);
+          onSend({ type: "set_passthrough", enabled: next });
+        }}
+        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium transition-all duration-150 border ${
+          passthrough
+            ? "bg-amber-500/10 border-amber-500/30 text-amber-400"
+            : "border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+        }`}
+      >
+        <span>Passthrough (sans DSP)</span>
+        <span className={`w-8 h-4 rounded-full relative transition-colors ${passthrough ? "bg-amber-500/40" : "bg-[var(--bg-card)]"}`}>
+          <span className={`absolute top-0.5 w-3 h-3 rounded-full transition-all ${passthrough ? "left-4 bg-amber-400" : "left-0.5 bg-[var(--text-muted)]"}`} />
         </span>
       </button>
 

@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
-import type { AudioMetrics, ListeningMode, VizMessage } from "@/types";
+import { useCallback, useState } from "react";
+import type { AudioMetrics, ConfigMessage, ListeningMode, VizMessage } from "@/types";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { MODE_COLORS } from "@/lib/constants";
 import { Header } from "@/components/header";
@@ -9,7 +9,8 @@ import { DeviceSelector } from "@/components/device-selector";
 import { ControlPanel } from "@/components/control-panel";
 import { WaveformCanvas } from "@/components/waveform-canvas";
 import { SpectrogramCanvas } from "@/components/spectrogram-canvas";
-import { AudioPlayer } from "@/components/audio-player";
+// Audio playback is now handled directly by the backend (sounddevice output)
+// import { AudioPlayer } from "@/components/audio-player";
 import { StatusBar } from "@/components/status-bar";
 
 export default function Home() {
@@ -19,11 +20,9 @@ export default function Home() {
   const [metrics, setMetrics] = useState<AudioMetrics | null>(null);
   const [waveformSamples, setWaveformSamples] = useState<Float32Array | null>(null);
   const [spectrogramRow, setSpectrogramRow] = useState<number[] | null>(null);
-
-  const feedAudioRef = useRef<((pcm: Float32Array) => void) | null>(null);
+  const [sampleRate, setSampleRate] = useState(44100);
 
   const onAudioFrame = useCallback((pcm: Float32Array) => {
-    feedAudioRef.current?.(pcm);
     setWaveformSamples(pcm);
   }, []);
 
@@ -32,9 +31,14 @@ export default function Home() {
     setSpectrogramRow(viz.spectrogram_row);
   }, []);
 
+  const onConfig = useCallback((config: ConfigMessage) => {
+    setSampleRate(config.sample_rate);
+  }, []);
+
   const { status, connect, send } = useWebSocket({
     onAudioFrame,
     onVizMessage,
+    onConfig,
   });
 
   const handleSend = useCallback(
@@ -76,9 +80,6 @@ export default function Home() {
     [isCapturing, send],
   );
 
-  const handleAudioReady = useCallback((feed: (pcm: Float32Array) => void) => {
-    feedAudioRef.current = feed;
-  }, []);
 
   return (
     <div className="h-screen flex flex-col bg-[var(--bg-primary)]">
@@ -106,19 +107,21 @@ export default function Home() {
           <WaveformCanvas
             samples={waveformSamples}
             color={MODE_COLORS[mode]}
-            height={180}
+            height={200}
           />
-          <SpectrogramCanvas row={spectrogramRow} height={240} />
+          <SpectrogramCanvas row={spectrogramRow} height={220} />
 
           {/* Empty state */}
           {!isCapturing && !waveformSamples && (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <div className="w-16 h-16 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex items-center justify-center mb-4">
-                <svg viewBox="0 0 24 24" className="w-7 h-7 text-[var(--text-muted)]" fill="none" stroke="currentColor" strokeWidth={1.5}>
-                  <path d="M12 3c-1.5 0-4 1-4 4v2c0 1.5.5 2 2 2h4c1.5 0 2-.5 2-2V7c0-3-2.5-4-4-4z" />
-                  <path d="M8 9l-2 1.5c-1 .8-1.5 2-1.5 3.2 0 2 1.5 3.3 3.5 3.3" />
-                  <path d="M16 9l2 1.5c1 .8 1.5 2 1.5 3.2 0 2-1.5 3.3-3.5 3.3" />
-                  <path d="M10 17v3.5a1.5 1.5 0 003 0V17" />
+                <svg viewBox="0 0 32 32" className="w-8 h-8" fill="none">
+                  <rect x="2" y="12" width="2.5" height="8" rx="1.25" fill="var(--text-muted)" opacity="0.5" />
+                  <rect x="7" y="8" width="2.5" height="16" rx="1.25" fill="var(--text-muted)" opacity="0.6" />
+                  <rect x="12" y="4" width="2.5" height="24" rx="1.25" fill="var(--text-muted)" opacity="0.7" />
+                  <rect x="17" y="6" width="2.5" height="20" rx="1.25" fill="var(--text-muted)" opacity="0.65" />
+                  <rect x="22" y="10" width="2.5" height="12" rx="1.25" fill="var(--text-muted)" opacity="0.55" />
+                  <rect x="27" y="13" width="2.5" height="6" rx="1.25" fill="var(--text-muted)" opacity="0.4" />
                 </svg>
               </div>
               <p className="text-sm text-[var(--text-secondary)] mb-1">
@@ -134,7 +137,7 @@ export default function Home() {
 
       <StatusBar metrics={metrics} mode={mode} />
 
-      <AudioPlayer isCapturing={isCapturing} onReady={handleAudioReady} />
+      {/* Audio playback handled by backend (sounddevice direct output) */}
     </div>
   );
 }
