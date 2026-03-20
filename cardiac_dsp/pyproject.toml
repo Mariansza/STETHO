@@ -1,0 +1,9 @@
+[project]
+name = "cardiac-dsp"
+version = "1.0.0"
+description = "Standalone cardiac DSP filter for real-time stethoscope audio processing"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.24", "scipy>=1.10"]
+
+[project.optional-dependencies]
+server = ["fastapi>=0.100", "uvicorn[standard]>=0.20", "websockets>=12.0"]
