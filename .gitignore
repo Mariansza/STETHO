@@ -25,8 +25,7 @@ _archive/*.mp3
 _archive/*.png
 
 # Autre
-
-CLAUDE.md 
+CLAUDE.md
 CONTEXT.md
-TECH-Les devices pour les nuls-190326-125749.pdf
-docs
+docs/
+.claude
