@@ -1,46 +1,50 @@
-# Stetho
+# Stetho — Filtre cardiaque asynchrone
 
-Traitement audio temps réel pour stéthoscope en téléconsultation.
-
-Un stéthoscope branché en jack/USB est capturé par le backend, traité par un pipeline DSP, puis streamé via WebSocket vers une interface web pour écoute et visualisation.
-
-```
-Stéthoscope ──→ Backend Python (DSP) ──→ WebSocket ──→ Frontend Next.js (audio + visu)
-```
-
-## Stack
-
-- **Backend** : Python 3.12 / FastAPI / sounddevice / NumPy / SciPy
-- **Frontend** : Next.js 14 / TypeScript / Tailwind CSS / AudioWorklet / Canvas 2D
-
-## Lancer
-
-```bash
-# Backend (localhost:8000)
-cd stetho && python -m uvicorn backend.main:app --reload
-
-# Frontend (localhost:3001)
-cd stetho/frontend && npm install && npm run dev
-```
+Filtre DSP cardiaque pour stéthoscope en téléconsultation. Prend un fichier WAV en entrée et produit un WAV filtré en sortie.
 
 ## Pipeline DSP
 
-Par chunk de 1024 samples @ 44100 Hz :
+1. **Bandpass 20-250 Hz** — Butterworth ordre 4, zero-phase (`sosfiltfilt`)
+2. **Emphase fréquentielle** — +6 dB @ 20-60 Hz (S1/S2), +3 dB @ 60-150 Hz
+3. **Gain + soft limiter** — gain réglable, `tanh` pour éviter le clipping
 
-1. DC removal (HP Butterworth 5 Hz)
-2. Passe-bande selon le mode
-3. Soustraction spectrale du bruit
-4. Emphase fréquentielle selon le mode
-5. Soft limiter + AGC
+## Utilisation
 
-## Modes d'écoute
+```bash
+pip install -r requirements.txt
 
-| Mode | Bande | Emphase | Ordre |
-|------|-------|---------|-------|
-| Cardiaque | 20–250 Hz | +6 dB @ 20-60 Hz, +3 dB @ 60-150 Hz | 4 |
-| Respiratoire | 80–1200 Hz | +6 dB @ 300-600 Hz, +3 dB @ 100-300 Hz | 3 |
-| Brut | 15–2000 Hz | Plat | 2 |
+# Basique
+python filter.py input.wav output.wav
 
-## Interface
+# Avec gain
+python filter.py input.wav output.wav --gain 2.0
+```
 
-Forme d'onde temps réel, spectrogramme défilant, sélecteur de périphérique, choix du mode, réglage du gain et réduction de bruit.
+## Sortie
+
+```
+Entrée    : input.wav
+  Format  : 44100 Hz, int16, 20.41s
+  RMS     : -7.9 dB
+  Peak    : 0.0 dB
+Pipeline  :
+  1. Bandpass 20-250 Hz (Butterworth ordre 4, zero-phase)
+  2. Emphase +6 dB @ 20-60 Hz, +3 dB @ 60-150 Hz
+  3. Gain 1.0x + soft limiter (tanh)
+Sortie    : output.wav
+  RMS     : -14.3 dB
+  Peak    : -2.1 dB
+OK
+```
+
+## Contexte
+
+Le stéthoscope apparaît comme un micro USB/jack standard. Le son capturé est un enregistrement brut qui contient du bruit hors bande. Ce filtre isole la bande cardiaque (20-250 Hz) et accentue les fréquences diagnostiques (S1/S2).
+
+Voir `TECH-Les devices pour les nuls-190326-125749.pdf` pour l'architecture des dispositifs médicaux Tessan.
+
+## Dépendances
+
+- Python 3.10+
+- NumPy
+- SciPy

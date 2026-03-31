@@ -1,31 +1,8 @@
-# Python
 __pycache__/
-*.py[cod]
-*.egg-info/
-venv/
+*.pyc
 .venv/
-
-# Node
-frontend/node_modules/
-.next/
-out/
-
-# IDE
-.vscode/
-.idea/
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Archive (keep tracked but ignore large audio files)
-_archive/*.wav
-_archive/*.ogg
-_archive/*.mp3
-_archive/*.png
-
-# Autre
-CLAUDE.md
-CONTEXT.md
-docs/
-.claude
+venv/
+*.egg-info/
+dist/
+build/
+.claude/
